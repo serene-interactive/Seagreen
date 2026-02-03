@@ -7,7 +7,6 @@
 
 An interactive Python process monitor with a beautiful terminal UI. Built with 💚 by [Serene Interactive, Global](https://sereneinteractive.com).
 
-![Seagreen Demo](demo.png)
 
 ## 🌿 Features
 
