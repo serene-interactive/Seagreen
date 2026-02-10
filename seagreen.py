@@ -12,6 +12,9 @@ Commands:
 
 import sys
 import time
+import math
+import random
+import threading
 import psutil
 from typing import Optional, List
 
@@ -20,6 +23,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.align import Align
+from rich.live import Live
 from rich import box
 
 from tracker import SeagreenTracker, SeagreenReport
@@ -37,28 +41,97 @@ COLORS = {
 console = Console()
 
 
+BANNER_ART = [
+    " ███████╗███████╗ █████╗  ██████╗ ██████╗ ███████╗███████╗███╗   ██╗",
+    " ██╔════╝██╔════╝██╔══██╗██╔════╝ ██╔══██╗██╔════╝██╔════╝████╗  ██║",
+    " ███████╗█████╗  ███████║██║  ███╗██████╔╝█████╗  █████╗  ██╔██╗ ██║",
+    " ╚════██║██╔══╝  ██╔══██║██║   ██║██╔══██╗██╔══╝  ██╔══╝  ██║╚██╗██║",
+    " ███████║███████╗██║  ██║╚██████╔╝██║  ██║███████╗███████╗██║ ╚████║",
+    " ╚══════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝",
+]
+
+WAVE_CHARS = ["~", "≈", "~", "∽", "≈", "~", "∿", "≈"]
+LEAF_CHARS = ["🌿", "🍃", "╲", "╱", "·"]
+
+WAVE_WIDTH = 70
+WAVE_ROWS = 3
+LEAF_FIELD_ROWS = 4
+ANIM_DURATION = 3.0
+ANIM_FPS = 8
+
+
+def _generate_wave_line(tick: int, row: int, width: int) -> str:
+    """Generate a single animated wave line."""
+    line = []
+    for col in range(width):
+        phase = (col * 0.3) + (tick * 0.6) + (row * 1.2)
+        idx = int((math.sin(phase) + 1) * 3.5) % len(WAVE_CHARS)
+        line.append(WAVE_CHARS[idx])
+    return "".join(line)
+
+
+def _generate_leaf_line(tick: int, row: int, width: int, seed: int) -> str:
+    """Generate a line with sparse drifting leaves."""
+    rng = random.Random(seed + tick * 7 + row * 31)
+    line = list(" " * width)
+    num_leaves = rng.randint(1, 3)
+    for _ in range(num_leaves):
+        col = (rng.randint(0, width - 2) + tick * 2 + row) % (width - 1)
+        char = rng.choice(LEAF_CHARS)
+        line[col] = char
+    return "".join(line)
+
+
+def _build_frame(tick: int) -> str:
+    """Build one full animation frame as a Rich-markup string."""
+    lines = []
+
+    # Falling leaves above the banner
+    for row in range(LEAF_FIELD_ROWS):
+        leaf_line = _generate_leaf_line(tick, row, WAVE_WIDTH, seed=42)
+        lines.append(f"[{COLORS['leaf']}]{leaf_line}[/{COLORS['leaf']}]")
+
+    # Static banner
+    for art_line in BANNER_ART:
+        lines.append(f"[bold {COLORS['primary']}]{art_line}[/bold {COLORS['primary']}]")
+
+    # Ocean waves beneath the banner
+    for row in range(WAVE_ROWS):
+        wave_line = _generate_wave_line(tick, row, WAVE_WIDTH)
+        lines.append(f"[{COLORS['ocean']}]{wave_line}[/{COLORS['ocean']}]")
+
+    # Subtitle block (static)
+    lines.append("")
+    lines.append(f"[bold {COLORS['leaf']}]🌊  Process Efficiency Monitor  🌿[/bold {COLORS['leaf']}]")
+    lines.append(f"[dim {COLORS['secondary']}]by Serene Interactive, Global[/dim {COLORS['secondary']}]")
+    lines.append("")
+    lines.append(f"[dim {COLORS['ocean']}]Type /help for commands[/dim {COLORS['ocean']}]")
+
+    centered = "\n".join(lines)
+    return centered
+
+
 def print_banner():
-    """Clean centered banner using Rich alignment"""
-    # ASCII art for SEAGREEN (narrower to fit better)
-    ascii_art = f"""[bold {COLORS['primary']}]
- ███████╗███████╗███████╗ ██████╗ ███████╗███████╗███╗   ██╗
- ██╔════╝██╔════╝██╔════╝██╔════╝ ██╔════╝██╔════╝████╗  ██║
- ███████╗█████╗  █████╗  ██║  ███╗█████╗  █████╗  ██╔██╗ ██║
- ╚════██║██╔══╝  ██╔══╝  ██║   ██║██╔══╝  ██╔══╝  ██║╚██╗██║
- ███████║███████╗███████╗╚██████╔╝███████╗███████╗██║ ╚████║
- ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═══╝[/bold {COLORS['primary']}]
-"""
-    
-    subtitle = f"[bold {COLORS['leaf']}]🌊  Process Efficiency Monitor  🌿[/bold {COLORS['leaf']}]"
-    company = f"[dim {COLORS['secondary']}]by Serene Interactive, Global[/dim {COLORS['secondary']}]"
-    hint = f"[dim {COLORS['ocean']}]Type /help for commands[/dim {COLORS['ocean']}]"
-    
+    """Animated startup banner with ocean waves and drifting leaves."""
+    total_frames = int(ANIM_DURATION * ANIM_FPS)
+    frame_delay = 1.0 / ANIM_FPS
+
     console.print()
-    console.print(Align.center(ascii_art))
-    console.print(Align.center(subtitle))
-    console.print(Align.center(company))
-    console.print()
-    console.print(Align.center(hint))
+    try:
+        with Live(
+            Align.center(Text.from_markup(_build_frame(0))),
+            console=console,
+            refresh_per_second=ANIM_FPS,
+            transient=True,
+        ) as live:
+            for tick in range(total_frames):
+                live.update(Align.center(Text.from_markup(_build_frame(tick))))
+                time.sleep(frame_delay)
+    except KeyboardInterrupt:
+        pass
+
+    # Print the final static frame so it stays on screen
+    console.print(Align.center(Text.from_markup(_build_frame(total_frames))))
     console.print()
 
 
