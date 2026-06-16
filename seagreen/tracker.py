@@ -7,8 +7,45 @@ import psutil
 import time
 import os
 import platform
+import subprocess
+import json
 from dataclasses import dataclass, field
 from typing import Optional, List, Tuple
+
+
+def is_android() -> bool:
+    """Check if running in Android/Termux environment"""
+    return 'ANDROID_ROOT' in os.environ or os.path.exists('/system/bin/app_process')
+
+
+def get_termux_battery_power() -> Optional[float]:
+    """Query Android's real-time battery power draw via termux-battery-status."""
+    if not is_android():
+        return None
+    try:
+        # Run termux-battery-status with 1s timeout
+        res = subprocess.run(['termux-battery-status'], capture_output=True, text=True, timeout=1.0)
+        if res.returncode == 0:
+            data = json.loads(res.stdout)
+            current = data.get('current_now')  # in microamperes (negative when discharging)
+            voltage = data.get('voltage')      # in microvolts or millivolts
+            if current is not None and voltage is not None:
+                v_val = float(voltage)
+                if v_val > 1000000:
+                    v_val = v_val / 1000000
+                elif v_val > 1000:
+                    v_val = v_val / 1000
+                
+                c_val = abs(float(current))
+                if c_val > 1000000:
+                    c_val = c_val / 1000000
+                elif c_val > 1000:
+                    c_val = c_val / 1000
+                
+                return v_val * c_val  # Watts
+    except Exception:
+        pass
+    return None
 
 
 @dataclass
@@ -217,13 +254,13 @@ def compute_green_grade(score: float) -> str:
 def compute_seagreen_rating(score: float) -> str:
     """Convert score to leaf rating"""
     if score >= 80:
-        return "[Leaf][Leaf][Leaf] Excellent"
+        return "🌱🌱🌱 Excellent"
     elif score >= 60:
-        return "[Leaf][Leaf] Good"
+        return "🌱🌱 Good"
     elif score >= 40:
-        return "[Leaf] Fair"
+        return "🌱 Fair"
     else:
-        return "[LeafFall] Needs Improvement"
+        return "🍂 Needs Improvement"
 
 
 def compute_component_breakdown(process_tree: List[dict]) -> dict:
@@ -296,17 +333,24 @@ class SeagreenEnergyTracker:
         self.agent_types = detect_agent_type(self.process_name, self.cmdline)
 
         # Platform TDP defaults
-        system = platform.system()
-        tdp_defaults = PLATFORM_TDP.get(system, {'idle': 5, 'max': 65})
-        self.tdp_idle = tdp_defaults['idle']
-        self.tdp_max = tdp_defaults['max']
+        if is_android():
+            self.tdp_idle = 0.5
+            self.tdp_max = 12.0
+        else:
+            system = platform.system()
+            tdp_defaults = PLATFORM_TDP.get(system, {'idle': 5, 'max': 65})
+            self.tdp_idle = tdp_defaults['idle']
+            self.tdp_max = tdp_defaults['max']
 
         # Grid carbon intensity
         self.grid_region, self.grid_intensity = get_grid_region()
+        if is_android():
+            self.grid_region = f"Mobile Device ({self.grid_region})"
 
         # Monitoring state
         self.snapshots: List[ResourceSnapshot] = []
         self.child_processes: List[dict] = []
+        self.last_child_update = 0.0
         self.start_time: Optional[float] = None
         self.start_timestamp: Optional[float] = None
 
@@ -345,7 +389,12 @@ class SeagreenEnergyTracker:
             mem_percent = 0
 
         # Estimate watts
-        watts = self._estimate_watts(cpu)
+        device_watts = get_termux_battery_power()
+        if device_watts is not None:
+            # Attribute power proportional to CPU usage
+            watts = device_watts * (cpu / 100.0)
+        else:
+            watts = self._estimate_watts(cpu)
 
         snapshot = ResourceSnapshot(
             timestamp=time.time(),
@@ -380,6 +429,10 @@ class SeagreenEnergyTracker:
 
     def _update_child_processes(self):
         """Discover and update child processes"""
+        now = time.time()
+        if now - self.last_child_update < 5.0 and self.child_processes:
+            return
+        self.last_child_update = now
         try:
             children = self.process.children(recursive=True)
             self.child_processes = []

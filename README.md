@@ -11,13 +11,13 @@ A real-time Python process monitor that tracks energy consumption, carbon footpr
 ## 🌿 Features
 
 - 🖥️ **Interactive Terminal UI** - Slash commands in your terminal (`/list`, `/track`, `/help`)
+- 💻 **Web GUI Dashboard** - Start a local web server with `/web` or `/gui` to view a premium real-time diagnostics dashboard
 - 🌊 **Real-time Monitoring** - Track CPU, memory, and energy usage with live updates
 - ⚡ **Energy Tracking** - Estimate power consumption and CO2 emissions per process
 - 🍃 **Green Score** - Get a 0-100 efficiency rating with eco equivalents
 - 🔍 **Window Titles** - Shows actual app names (not just process names) for easy identification
 - 📋 **Command Line Filtering** - `/list chrome` filters processes instantly
-- 🎨 **Beautiful Design** - Soothing ocean-green colors matching sereneinteractive.com
-- 🔒 **Privacy First** - All local processing, no data leaves your machine
+- 🔒 **Privacy First** - All local processing, no AI dependencies, no data leaves your machine
 
 ## 🚀 Installation
 
@@ -54,6 +54,7 @@ seagreen
 | `/ungreen <pid>` | Restore process from green mode |
 | `/green-list` | Show processes in green mode |
 | `/kill <pid>` | Terminate a process |
+| `/web` or `/gui` | Launch Seagreen Web GUI Dashboard |
 | `/help` | Show all available commands |
 | `/quit` | Exit Seagreen |
 
@@ -152,7 +153,7 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## 🌊 About Serene Interactive
 
-**Serene Interactive, Global (SiG)** is an interactive media and technology company supporting digital creators and communities. We believe smart technology should never come at the cost of your privacy or the future.
+Serene Interactive, Global is an AI research and development company. We build software and AI systems with privacy, accessibility, and sustainability at their core. We believe smart technology should never come at the cost of your privacy or the future.
 
 - 🌐 [sereneinteractive.com](https://sereneinteractive.com)
 - 💬 [Discord](https://discord.gg/rosy)

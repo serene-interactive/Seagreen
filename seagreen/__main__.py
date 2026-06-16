@@ -14,6 +14,7 @@ Commands:
   /ungreen <pid>    - Restore a process from green mode
   /green-list       - Show processes currently in green mode
   /kill <pid>       - Terminate a process
+  /web or /gui      - Start and launch the Seagreen Web GUI Dashboard
   /help             - Show all commands
   /quit             - Exit Seagreen
 """
@@ -23,6 +24,7 @@ import time
 import math
 import random
 import os
+import webbrowser
 import psutil
 from typing import Optional, List, Dict
 
@@ -37,7 +39,7 @@ from rich.text import Text
 from rich.align import Align
 from rich.live import Live
 from rich import box
-from .tracker import SeagreenEnergyTracker, AgentEnergyReport
+from .tracker import SeagreenEnergyTracker, AgentEnergyReport, is_android
 
 # Colors matching sereneinteractive.com
 COLORS = {
@@ -289,6 +291,8 @@ AGENT_PATTERNS = {
 
 def list_python_processes(filter_text: str = ""):
     """Show all trackable processes, optionally filtered by name/cmdline"""
+    if is_android():
+        console.print(f"[bold {COLORS['warning']}]Running in sandboxed Android environment. System-wide process monitoring is disabled unless running with root. Displaying Termux-only processes.[/bold {COLORS['warning']}]")
     processes = []
 
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
@@ -736,6 +740,7 @@ def print_help():
   [bold]/ungreen <pid>[/bold]       - Restore process from green mode
   [bold]/green-list[/bold]          - Show processes in green mode
   [bold]/kill [pid][/bold]          - Terminate a process (or pick interactively)
+  [bold]/web[/bold] or [bold]/gui[/bold]          - Launch Seagreen Web GUI Dashboard
   [bold]/help[/bold]                - Show this help message
   [bold]/quit[/bold]                - Exit Seagreen
 
@@ -756,6 +761,7 @@ def print_help():
 
 def main():
     print_banner()
+    web_server = None
     
     while True:
         try:
@@ -840,6 +846,23 @@ def main():
                 except ValueError:
                     console.print(f"[bold red]PID must be a number. Example: /ungreen 1234[/bold red]")
 
+            elif command in ['/web', '/gui']:
+                if web_server is None:
+                    from .server import start_web_server
+                    # Try to start server on 8080, fallback up to 8090
+                    for port in range(8080, 8091):
+                        web_server = start_web_server(port)
+                        if web_server is not None:
+                            console.print(f"[bold {COLORS['leaf']}]Started Seagreen Web Dashboard on http://localhost:{port} 🌊[/bold {COLORS['leaf']}]")
+                            webbrowser.open(f"http://localhost:{port}")
+                            break
+                    else:
+                        console.print(f"[bold red]Failed to start web server. Ports 8080-8090 were unavailable.[/bold red]")
+                else:
+                    port = web_server.server_address[1]
+                    console.print(f"[bold {COLORS['primary']}]Web server is already running on http://localhost:{port}[/bold {COLORS['primary']}]")
+                    webbrowser.open(f"http://localhost:{port}")
+
             elif command == '/green-list':
                 list_green_processes()
 
@@ -853,9 +876,14 @@ def main():
             break
 
 
-def scan_trackable_processes(agent_only: bool = False, filter_text: str = "") -> list:
-    """Scan for processes, optionally filtering by agent or name"""
+def scan_trackable_processes(agent_only: bool = False, filter_text: str = "", filter_type: str = None) -> list:
+    """Scan for processes with hierarchical filtering: agents, dev, apps, all"""
     results = []
+    
+    # Resolve filter_type if not explicitly set
+    if not filter_type:
+        filter_type = "agents" if agent_only else "dev"
+        
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
             pid = proc.info['pid']
@@ -866,7 +894,7 @@ def scan_trackable_processes(agent_only: bool = False, filter_text: str = "") ->
             cmdline_str = ' '.join(cmdline)[:60]
 
             # Skip Windows kernel processes
-            if name in ['System', 'Registry', 'smss.exe']:
+            if name in ['System', 'Registry', 'smss.exe', 'Idle']:
                 continue
 
             full_text = (name + ' ' + cmdline_str).lower()
@@ -880,10 +908,20 @@ def scan_trackable_processes(agent_only: bool = False, filter_text: str = "") ->
                      'go' in name.lower() or 'rust' in name.lower() or \
                      'docker' in name.lower()
 
-            if agent_only and not is_agent:
-                continue
-            if not is_agent and not is_dev:
-                continue
+            has_window = _get_window_title(pid) is not None
+
+            # Apply filter type conditions
+            if filter_type == "agents":
+                if not is_agent:
+                    continue
+            elif filter_type == "dev":
+                if not is_agent and not is_dev:
+                    continue
+            elif filter_type == "apps":
+                if not is_agent and not is_dev and not has_window:
+                    continue
+            # "all" does not apply any exclusions beyond system idle/registry
+
             if filter_text and filter_text not in full_text:
                 continue
 
@@ -893,6 +931,7 @@ def scan_trackable_processes(agent_only: bool = False, filter_text: str = "") ->
                 'app_name': get_process_display_name(pid),
                 'cmdline': cmdline_str,
                 'is_agent': is_agent,
+                'has_window': has_window,
             })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
@@ -905,6 +944,8 @@ def pick_process(
     allow_cancel: bool = True,
 ) -> Optional[int]:
     """Interactive process picker. Returns pid or None if cancelled."""
+    if is_android():
+        console.print(f"[bold {COLORS['warning']}]Running in sandboxed Android environment. System-wide process monitoring is disabled unless running with root. Displaying Termux-only processes.[/bold {COLORS['warning']}]")
     processes = scan_trackable_processes(agent_only=agent_only)
     if not processes:
         console.print(f"[bold yellow]No {'agent ' if agent_only else ''}processes found.[/bold yellow]")
