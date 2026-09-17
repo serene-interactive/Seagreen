@@ -21,6 +21,15 @@ struct AppGroup: Identifiable {
     }
 }
 
+// Existing identities keep their slots, including stopped rows until manual refresh.
+func retainingApplicationRows(_ previous: [AppGroup], incoming: [AppGroup]) -> [AppGroup] {
+    let byID = Dictionary(uniqueKeysWithValues: incoming.map { ($0.id, $0) })
+    let existing = Set(previous.map(\.id))
+    return previous.map { old in
+        byID[old.id] ?? AppGroup(id: old.id, name: old.name, bundle: old.bundle, processes: [])
+    } + incoming.filter { !existing.contains($0.id) }
+}
+
 @MainActor final class AppModel: ObservableObject {
     @Published var sample: SystemSample?
     @Published var timeline: [TimelinePoint] = []
@@ -79,7 +88,8 @@ struct AppGroup: Identifiable {
                                   watts: next.power?.watts, powerKey: next.power?.key)
         timeline.append(point)
         if timeline.count > 150 { timeline.removeFirst(timeline.count - 150) }
-        groups = groupProcesses(next.processes)
+        let incoming = groupProcesses(next.processes)
+        groups = retainingApplicationRows(groups, incoming: incoming)
         if var recording = active {
             energy.add(time: next.uptime, power: next.power)
             recording.points.append(point); recording.ended = next.date
@@ -106,7 +116,17 @@ struct AppGroup: Identifiable {
             let bundle = bundles[key]
             let name = bundle.map { $0.deletingPathExtension().lastPathComponent } ?? value[0].name
             return AppGroup(id: key, name: name, bundle: bundle, processes: value)
-        }.sorted { ($0.cpu ?? -1) > ($1.cpu ?? -1) }
+        }.sorted {
+            let a = $0.cpu ?? -1, b = $1.cpu ?? -1
+            return a == b ? $0.id < $1.id : a > b
+        }
+    }
+    func refreshApplicationOrder(by sort: String) {
+        groups = groups.filter { !$0.processes.isEmpty }.sorted {
+            let a = sort == "Memory" ? Double($0.memory) : ($0.cpu ?? -1)
+            let b = sort == "Memory" ? Double($1.memory) : ($1.cpu ?? -1)
+            return a == b ? $0.id < $1.id : a > b
+        }
     }
     func beginRecording(title: String, notes: String, units: String, unitName: String) {
         guard active == nil else { return }

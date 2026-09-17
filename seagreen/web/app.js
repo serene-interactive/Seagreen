@@ -34,12 +34,55 @@ function openRecord(){if(state?.active){action(async()=>{await api('record/finis
 $('record-button').onclick=openRecord;$('new-recording').onclick=openRecord;$('cancel-recording').onclick=()=>$('record-dialog').close();
 $('record-form').onsubmit=e=>{e.preventDefault();action(async()=>{await api('record/start',{title:$('record-title').value,notes:$('record-notes').value,units:Number($('record-units').value),unitName:$('record-unit-name').value});$('record-dialog').close();go('experiments');});};
 $('finish-recording').onclick=()=>action(async()=>{await api('record/finish',{});await loadRecords();});
-$('search').oninput=renderProcesses;$('sort').onchange=renderProcesses;
+$('search').oninput=renderProcesses;$('sort').onchange=()=>renderProcesses(true);$('refresh-processes').onclick=()=>renderProcesses(true);
 $('chart-cpu').onclick=()=>{powerChart=false;drawChart();};$('chart-power').onclick=()=>{powerChart=true;drawChart();};
 $('pause-monitor').onclick=()=>action(()=>api('monitor/pause',{paused:!state?.paused}));
 $('job-form').onsubmit=e=>{e.preventDefault();action(async()=>{const executable=$('executable').value.trim();if(await ask('Launch this executable?',executable+' will run with your user permissions. Arguments are passed directly, without a shell. Only run programs you trust.','Launch job'))await api('job/launch',{executable,arguments:$('arguments').value.split(/\r?\n/).filter(x=>x!==''),efficient:$('efficient').checked});});};
 $('stop-job').onclick=()=>action(async()=>{if(await ask('Stop the launched process?','Only the process launched by Seagreen receives the termination request. Independently running child processes may continue.','Request termination'))await api('job/stop',{});});
-function renderProcesses(){if(!state?.sample)return;const q=$('search').value.toLowerCase(),sort=$('sort').value;const processes=state.sample.processes.filter(p=>p.name.toLowerCase().includes(q)).sort((a,b)=>(b[sort]??-1)-(a[sort]??-1));const fragment=document.createDocumentFragment();for(const p of processes){const tr=el('tr');const io=p.readRate==null&&p.writeRate==null?'—':fmt(((p.readRate||0)+(p.writeRate||0))/1024,0)+' KB/s';for(const value of [p.name,String(p.pid),size(p.memory),io,fmt(p.cpu)+'%'])tr.append(el('td',value));const actions=el('td'),quit=el('button','Quit','process-action'),force=el('button','Force quit','process-action');quit.onclick=()=>controlProcess(p,'quit');force.onclick=()=>controlProcess(p,'force');quit.setAttribute('aria-label','Quit '+p.name+' PID '+p.pid);force.setAttribute('aria-label','Force quit '+p.name+' PID '+p.pid);quit.disabled=force.disabled=!!p.protected;if(p.protected){quit.title=force.title='Protected system or Seagreen process';}actions.append(quit,force);tr.append(actions);fragment.append(tr);}if(!processes.length){const tr=el('tr'),td=el('td','No matching processes.');td.colSpan=6;tr.append(td);fragment.append(tr);}$('process-rows').replaceChildren(fragment);$('process-note').textContent=`${processes.length} processes shown · ${state.sample.inaccessible} could not be read. Some system processes are protected. Shared memory can appear in multiple processes.`;}
+const processRows = new Map();
+const processKey = p => `${p.pid}:${p.created}`;
+function renderProcesses(resetOrder=false){
+    if(!state?.sample)return;
+    const body=$('process-rows'),q=$('search').value.toLowerCase(),sort=$('sort').value;
+    const current=new Map(state.sample.processes.map(p=>[processKey(p),p]));
+    if(resetOrder===true){
+        for(const [key,row] of processRows){if(!current.has(key)){row.remove();processRows.delete(key);}}
+    }
+    const incoming=[...current.values()].sort((a,b)=>((b[sort]??-1)-(a[sort]??-1))||a.pid-b.pid);
+    for(const p of incoming){
+        const key=processKey(p);
+        if(processRows.has(key))continue;
+        const row=el('tr');
+        for(let i=0;i<5;i++)row.append(el('td'));
+        const actions=el('td'),quit=el('button','Quit','process-action'),force=el('button','Force quit','process-action');
+        quit.onclick=()=>{if(row.liveProcess)controlProcess(row.liveProcess,'quit');};
+        force.onclick=()=>{if(row.liveProcess)controlProcess(row.liveProcess,'force');};
+        actions.append(quit,force);row.append(actions);processRows.set(key,row);body.append(row);
+    }
+    if(resetOrder===true){for(const p of incoming)body.append(processRows.get(processKey(p)));}
+    let shown=0;
+    for(const [key,row] of processRows){
+        const p=current.get(key);row.liveProcess=p||null;
+        if(p)row.lastProcess=p;
+        const info=p||row.lastProcess;
+        row.hidden=!info.name.toLowerCase().includes(q);if(!row.hidden)shown++;
+        row.classList.toggle('stopped',!p);
+        const io=p&&(p.readRate!=null||p.writeRate!=null)?fmt(((p.readRate||0)+(p.writeRate||0))/1024,0)+' KB/s':'—';
+        row.children[0].title=info.name;
+        const values=[info.name,String(info.pid),p?size(p.memory):'—',io,p?fmt(p.cpu)+'%':'Stopped'];
+        values.forEach((value,i)=>{if(row.children[i].textContent!==value)row.children[i].textContent=value;});
+        const cpu=row.children[4],valid=p&&Number.isFinite(p.cpu);
+        cpu.style.backgroundColor=valid?`hsl(${145-110*Math.min(100,Math.max(0,p.cpu))/100} 55% 40% / 0.12)`:'transparent';
+        cpu.className='cpu-cell';
+        for(const button of row.children[5].children){
+            button.disabled=!p||!!p.protected;
+            button.title=!p?'Process stopped':p.protected?'Protected system or Seagreen process':'';
+            button.setAttribute('aria-label',button.textContent+' '+info.name+' PID '+info.pid);
+        }
+    }
+    $('process-note').textContent=`${shown} rows shown · ${state.sample.inaccessible} processes could not be read. Values update live; rows stay in place. Refresh list to sort again and clear stopped processes. CPU tint shows activity, not energy waste.`;
+}
+
 function renderTop(){const fragment=document.createDocumentFragment();for(const p of state.sample.processes.slice(0,4)){const row=el('div',undefined,'process-row'),symbol=el('span',undefined,'process-symbol');symbol.append(icon('terminal'));const info=el('div');info.append(el('strong',p.name),el('small','PID '+p.pid));row.append(symbol,info,el('span',fmt(p.cpu)+'%','value'));fragment.append(row);}$('top-processes').replaceChildren(fragment);}
 function render(){if(!state?.sample)return;const s=state.sample;$('connection').replaceChildren(el('i'),document.createTextNode(state.paused?'Monitoring paused':'Local monitoring · every 2 seconds'));$('cpu-value').textContent=fmt(s.cpu);$('memory-value').textContent=fmt(s.memory/1024**3);$('power-value').textContent=fmt(s.power?.watts);$('power-scope').textContent=s.power?.scope||'No supported power reading';$('platform-tag').textContent=s.platform+' · '+s.cores+' logical cores';$('record-button').replaceChildren(icon('record'),document.createTextNode(state.active?'Finish recording':'Record session'));$('active-recording').hidden=!state.active;$('new-recording').disabled=!!state.active;if(state.active){$('active-title').textContent=state.active.title;$('active-stats').textContent=duration(elapsed(state.active))+' · '+fmt(coverage(state.active)*100,0)+'% power coverage · '+state.active.points.length+' samples';}const job=state.job;$('job-name').textContent=job.name||'Ready when you are';$('job-status').textContent=job.status;$('job-policy').textContent=job.policy||'';$('job-output').textContent=job.output;$('job-output').hidden=!job.output;$('stop-job').hidden=!job.running;$('launch-button').disabled=job.running;$('pause-monitor').textContent=state.paused?'Resume monitoring':'Pause monitoring';$('pause-monitor').disabled=!!state.active;$('collection-detail').textContent='Last collection: '+fmt(s.collectionMS)+' ms · sample interval: 2 seconds · live chart: 5 minutes';$('source-name').textContent=s.power?.source||'No live power source';if(s.power)$('source-detail').textContent=s.power.scope+'. Hardware package counters do not include the display, power supply, or other device components.';if(s.cpu>70){$('insight-title').textContent='There’s substantial work in progress.';$('insight-body').textContent='Check which processes are busy. High CPU may be useful work; it does not by itself mean energy is being wasted.';}else{$('insight-title').textContent='Start with a baseline.';$('insight-body').textContent='Record a typical task before changing its settings. Repeat it afterward to compare runtime, resource usage, and available energy data.';}if(page==='overview'){renderTop();drawChart();}if(page==='applications')renderProcesses();if(state.error)notice(state.error);}
 function drawChart(){const canvas=$('history-chart');if(page!=='overview'||!state)return;const points=state.history||[];const valid=points.some(p=>(powerChart?p.watts:p.cpu)!=null);$('chart-empty').hidden=valid||!powerChart;$('chart-cpu').classList.toggle('active',!powerChart);$('chart-power').classList.toggle('active',powerChart);$('chart-caption').textContent=powerChart?(state.sample?.power?.source||'No power samples available'):'System utilization, sampled every two seconds';canvas.setAttribute('aria-label',powerChart?'Power history in watts':'System CPU history, percent of all cores');const box=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;if(!box.width)return;canvas.width=box.width*dpr;canvas.height=box.height*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);const w=box.width,h=box.height,l=35,r=8,t=8,b=25;const maximum=powerChart?Math.max(10,...points.map(p=>(p.watts||0)*1.2)):100;ctx.font='10px -apple-system,Segoe UI,sans-serif';ctx.strokeStyle='#e4e9dc';ctx.fillStyle='#71806e';for(let i=0;i<5;i++){let y=t+(h-t-b)*i/4;ctx.beginPath();ctx.moveTo(l,y);ctx.lineTo(w-r,y);ctx.stroke();ctx.fillText(String(Math.round(maximum*(1-i/4))),0,y+3);}if(!points.length)return;const end=points[points.length-1].date,start=end-300;const x=p=>l+(p.date-start)/300*(w-l-r),y=v=>t+(1-v/maximum)*(h-t-b);ctx.lineWidth=2;ctx.strokeStyle='#397956';ctx.beginPath();let last=null;for(const p of points){const v=powerChart?p.watts:p.cpu;if(v==null){last=null;continue;}if(!last||p.date-last.date>15||(powerChart&&p.powerKey!==last.powerKey))ctx.moveTo(x(p),y(v));else ctx.lineTo(x(p),y(v));last=p;}ctx.stroke();for(let i=0;i<5;i++){const time=start+i*75;ctx.fillText(new Date(time*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),l+i*(w-l-r)/4-13,h-3);}}

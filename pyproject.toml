@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seagreen"
-version = "3.0.0"
+version = "3.0.1"
 description = "Local resource and energy monitoring with a macOS app and web UI"
 readme = "README.md"
 license = {text = "MIT"}

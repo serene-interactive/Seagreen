@@ -31,7 +31,7 @@ struct OverviewView: View {
         }
         HStack(alignment: .top, spacing: 18) {
             Panel(title: "Where your resources go") {
-                ForEach(Array(model.groups.prefix(4))) { group in AppRow(group: group, compact: true) }
+                ForEach(Array(model.groups.filter { !$0.processes.isEmpty }.sorted { ($0.cpu ?? -1) > ($1.cpu ?? -1) }.prefix(4))) { group in AppRow(group: group, compact: true) }
                 Button("Explore applications") { model.selectedPage = "Applications" }.buttonStyle(SecondaryButton())
             }
             Panel(title: "A useful next step") {
@@ -82,12 +82,16 @@ struct AppIcon: View {
 struct AppRow: View {
     let group: AppGroup
     var compact = false
+    private var cpuHue: Color {
+        let load = min(100, max(0, group.cpu ?? 0)) / 100
+        return Color(hue: (145 - 110 * load) / 360, saturation: 0.55, brightness: 0.65)
+    }
     var body: some View {
         HStack(spacing: 12) {
             AppIcon(group: group)
             VStack(alignment: .leading, spacing: 4) {
                 Text(group.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                Text("\(group.processes.count) process\(group.processes.count == 1 ? "" : "es")").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                Text(group.processes.isEmpty ? "Stopped" : "\(group.processes.count) process\(group.processes.count == 1 ? "" : "es")").font(.system(size: 10)).foregroundStyle(Palette.muted)
             }
             Spacer()
             if !compact {
@@ -95,6 +99,7 @@ struct AppRow: View {
                 Text(group.ioRate.map { "\(decimal($0 / 1024, places: 0)) KB/s" } ?? "—").frame(width: 100, alignment: .trailing).foregroundStyle(Palette.muted)
             }
             Text("\(decimal(group.cpu))%").monospacedDigit().frame(width: 68, alignment: .trailing)
+                .background(cpuHue.opacity(group.cpu == nil ? 0 : 0.12), in: RoundedRectangle(cornerRadius: 5))
         }.font(.system(size: 12)).padding(.vertical, 7)
     }
 }
@@ -107,7 +112,7 @@ struct ApplicationsView: View {
     @State private var selected: AppGroup?
     var filtered: [AppGroup] {
         model.groups.filter { (!appsOnly || $0.bundle != nil) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) }
-            .sorted { sort == "Memory" ? $0.memory > $1.memory : ($0.cpu ?? -1) > ($1.cpu ?? -1) }
+
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -116,12 +121,16 @@ struct ApplicationsView: View {
             Text("Grouped by application bundle. CPU uses 100% for one logical core, so a busy app can exceed 100%.").font(.system(size: 12)).foregroundStyle(Palette.muted)
         }
         Panel {
-            HStack(spacing: 18) {
-                TextField("Find an application or process", text: $query).textFieldStyle(.roundedBorder).frame(maxWidth: 300)
-                Toggle("Apps only", isOn: $appsOnly).toggleStyle(.switch).controlSize(.small)
+            HStack(spacing: 12) {
+                TextField("Find an application or process", text: $query).textFieldStyle(.roundedBorder).frame(minWidth: 120, maxWidth: 240)
+                Toggle("Apps only", isOn: $appsOnly).toggleStyle(.switch).controlSize(.small).fixedSize()
                 Spacer()
                 Picker("Sort by", selection: $sort) { Text("CPU").tag("CPU"); Text("Memory").tag("Memory") }.frame(width: 145)
+                    .onChange(of: sort) { model.refreshApplicationOrder(by: $0) }
+                Button("Refresh list") { model.refreshApplicationOrder(by: sort) }.buttonStyle(SecondaryButton()).fixedSize()
             }
+            Text("Values update live; rows stay in place. Refresh list to sort again and clear stopped apps. CPU tint shows activity, not energy waste.")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Eyebrow(text: "Application"); Spacer()
                 Text("MEMORY").frame(width: 95, alignment: .trailing)
@@ -131,7 +140,7 @@ struct ApplicationsView: View {
             if filtered.isEmpty { Text("No matching applications.").foregroundStyle(Palette.muted).padding(.vertical, 25) }
             LazyVStack(spacing: 0) {
                 ForEach(filtered) { group in
-                    Button { selected = group } label: { AppRow(group: group).contentShape(Rectangle()) }.buttonStyle(.plain)
+                    Button { selected = group } label: { AppRow(group: group).contentShape(Rectangle()) }.buttonStyle(.plain).disabled(group.processes.isEmpty).opacity(group.processes.isEmpty ? 0.5 : 1)
                     Divider().overlay(Palette.line.opacity(0.4))
                 }
             }

@@ -3,3 +3,6 @@
 .record-info p{overflow-wrap:anywhere}
 
 .process-action{font-size:11px;padding:7px 9px;margin:2px;white-space:nowrap}td:last-child:has(.process-action){min-width:155px}td:first-child{overflow-wrap:anywhere;max-width:260px}
+
+.cpu-cell{font-variant-numeric:tabular-nums;transition:background-color .5s ease}tr.stopped{opacity:.5}.update-link{font-size:11px;color:var(--ink,#183e33)}@media(prefers-reduced-motion:reduce){.cpu-cell{transition:none}}
+#applications table{table-layout:fixed;min-width:760px}#applications th:nth-child(2){width:75px}#applications th:nth-child(3){width:105px}#applications th:nth-child(4){width:110px}#applications th:nth-child(5){width:95px}#applications th:nth-child(6){width:170px}

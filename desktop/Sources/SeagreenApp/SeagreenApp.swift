@@ -46,6 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(after: .appInfo) {
+                Button("Get Updates…") { NSWorkspace.shared.open(URL(string: "https://github.com/serene-interactive/Seagreen/releases/latest")!) }
+            }
             CommandMenu("Monitoring") {
                 Button(model.paused ? "Resume Monitoring" : "Pause Monitoring") { model.paused.toggle() }
                     .disabled(model.active != nil).keyboardShortcut("p", modifiers: [.command, .shift])
@@ -110,7 +113,7 @@ struct ContentView: View {
                     }.padding(32).frame(maxWidth: 1400)
                 }
                 HStack {
-                    Text("SEAGREEN 3.0.0").tracking(1.2)
+                    Text("SEAGREEN 3.0.1").tracking(1.2)
                     Spacer()
                     Text("On-device. No account. No telemetry.")
                 }.font(.system(size: 9, design: .monospaced)).foregroundStyle(Palette.muted).padding(.horizontal, 32).padding(.vertical, 12)

@@ -50,6 +50,14 @@ Keep the terminal open. The dashboard binds only to `127.0.0.1` and opens with a
 seagreen web --port 8081
 ```
 
+## Updating
+
+Use **Get Updates** in the Mac app’s Seagreen menu or the web UI to open the latest GitHub release. Updates are installed manually.
+
+On macOS, quit Seagreen and replace the app in Applications with the latest download. Local recordings remain in place. On Windows, stop the monitor, download the updated source (or run `git pull` in your clone), then run **Launch Seagreen.cmd** again. For a manual Python install, run `python -m pip install --upgrade .` from the updated source folder and restart the monitor.
+
+Application rows stay in place while live values update. Use **Refresh list** or change the sort selection to reorder them and clear stopped processes. CPU hues indicate activity, not measured energy use.
+
 ## Terminal
 
 ```bash

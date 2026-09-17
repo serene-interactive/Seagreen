@@ -63,7 +63,8 @@ class ServerTests(unittest.TestCase):
         status, html, headers = self.request('/', authorized=False)
         self.assertEqual(status, 200)
         self.assertIn("frame-ancestors 'none'", headers['Content-Security-Policy'])
-        self.assertNotIn(b'https://', html)
+        # An explicit release link is navigation, not a remotely loaded asset.
+        self.assertNotIn(b'https://', html.replace(b'https://github.com/serene-interactive/Seagreen/releases/latest', b''))
         self.assertNotIn(self.server.token.encode(), html)
         for file in ['/app.js', '/style.css', '/mark.svg']:
             self.assertEqual(self.request(file, authorized=False)[0], 200)

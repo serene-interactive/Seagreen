@@ -14,3 +14,7 @@ xcrun swiftc -parse-as-library -target "$ARCH-apple-macos13.0" -sdk "$SDK" -I "$
   -framework AppKit -framework IOKit -lproc "$OUT/libSeagreenCore.a" \
   Sources/SeagreenApp/ProcessControl.swift scripts/ControlTests.swift -o "$OUT/tests/ControlTests"
 "$OUT/tests/ControlTests"
+xcrun swiftc -parse-as-library -target "$ARCH-apple-macos13.0" -sdk "$SDK" -I "$OUT" -I Sources/SGSystem/include \
+  -framework SwiftUI -framework AppKit -framework IOKit -lproc "$OUT/libSeagreenCore.a" \
+  Sources/SeagreenApp/AppModel.swift scripts/RowTests.swift -o "$OUT/tests/RowTests"
+"$OUT/tests/RowTests"
