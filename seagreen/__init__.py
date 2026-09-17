@@ -1,2 +1,2 @@
-"""Seagreen - Live Process Energy Monitor"""
-__version__ = "2.1.0"
+"""Seagreen - Local resource and energy monitoring."""
+__version__ = "3.0.0"

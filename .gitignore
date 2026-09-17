@@ -7,3 +7,12 @@ build/
 *.egg
 
 # Seagreen v2.1.0
+
+# Local builds and recordings
+.DS_Store
+.build/
+.swiftpm/
+.venv/
+*.dmg
+*.zip
+.pytest_cache/

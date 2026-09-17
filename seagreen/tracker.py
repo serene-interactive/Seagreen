@@ -1,6 +1,6 @@
 """
 [Sea] Seagreen Tracker Module -- Process Energy Monitoring
-Energy estimation, carbon tracking, and Green Score for any process
+Legacy v2 compatibility estimates. The v3 app and web UI use monitor.py instead.
 """
 
 import psutil
@@ -411,21 +411,10 @@ class SeagreenEnergyTracker:
         return snapshot
 
     def _estimate_watts(self, cpu_percent: float) -> float:
-        """Estimate power consumption from CPU utilization.
-        Uses a linear model between idle and max TDP.
-        For low-CPU processes (<5%), subtracts the system idle baseline
-        to avoid attributing system power to an idle process.
-        """
-        # Full system power estimate
-        full_watts = self.tdp_idle + (self.tdp_max - self.tdp_idle) * (cpu_percent / 100)
-
-        if cpu_percent < 5.0 and self.system_idle_watts is not None:
-            # For nearly idle processes, attribute only the power above idle
-            # This prevents inflating energy for processes doing almost nothing
-            process_watts = max(0, full_watts - self.system_idle_watts)
-            return process_watts
-        else:
-            return full_watts
+        """Legacy, uncalibrated CPU-proportional estimate; excludes device idle power."""
+        capacity = max(1, psutil.cpu_count() or 1) * 100
+        fraction = min(1, max(0, cpu_percent / capacity))
+        return max(0, self.tdp_max - self.tdp_idle) * fraction
 
     def _update_child_processes(self):
         """Discover and update child processes"""
@@ -477,22 +466,17 @@ class SeagreenEnergyTracker:
         peak_memory = max(mem_values)
         avg_watts = sum(watts_values) / len(watts_values)
 
-        # Also calculate process-only watts (excluding system idle baseline)
-        if self.system_idle_watts is not None:
-            process_watts = [max(0, w - self.system_idle_watts) if s.cpu_percent < 5 else w
-                           for w, s in zip(watts_values, self.snapshots)]
-            avg_process_watts = sum(process_watts) / len(process_watts) if process_watts else avg_watts
-        else:
-            avg_process_watts = avg_watts
+        # Legacy model only; no hardware measurement or verified savings claim.
+        avg_process_watts = avg_watts
 
         # CPU-seconds: total CPU time consumed
         cpu_seconds = (avg_cpu / 100) * duration
 
         # Energy: use process-attributable watts for session energy
         # This avoids inflating energy with system idle baseline
-        session_kwh = avg_process_watts * (duration / 3600)
+        session_kwh = avg_process_watts * (duration / 3_600_000)
 
-        # Carbon: kWh × grid intensity (g CO₂/kWh) / 1000 = g CO₂
+        # Carbon: kWh × grid intensity (g CO₂/kWh) = g CO₂
         session_co2_g = session_kwh * self.grid_intensity
 
         # Green Score

@@ -1,0 +1,4 @@
+module SGSystem {
+    header "SGSystem.h"
+    export *
+}

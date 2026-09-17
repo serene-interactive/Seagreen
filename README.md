@@ -1,165 +1,81 @@
-# 🌊 Seagreen
+<p align="center">
+  <img src="docs/assets/seagreen-logo.png" width="116" height="116" alt="Seagreen — a sage-green water droplet with flowing contours on deep forest green">
+</p>
 
-**Live process energy & carbon monitoring for developers.**
+<h1 align="center">Seagreen</h1>
+<p align="center"><strong>A lighter footprint. A clearer picture.</strong></p>
+<p align="center">Thoughtful tools for understanding your computer.<br>Observe your workloads, measure changes, and make every adjustment count.</p>
+<p align="center">
+  <a href="https://github.com/serene-interactive/Seagreen/releases/latest">Download Seagreen</a> ·
+  <a href="#windows--web-ui">Windows & web UI</a> ·
+  <a href="#terminal">Terminal</a> ·
+  <a href="https://sereneinteractive.com">By Serene Interactive</a>
+</p>
 
 [![Made by Serene Interactive, Global](https://img.shields.io/badge/Made%20by-Serene%20Interactive-3d8b6f?style=for-the-badge)](https://sereneinteractive.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-4a9b6e?style=for-the-badge)](LICENSE)
 
-A real-time Python process monitor that tracks energy consumption, carbon footprint, and efficiency. Built with 💚 by [Serene Interactive, Global](https://sereneinteractive.com).
+## A considered workspace
 
+- Native SwiftUI app for macOS 13+, with a menu-bar monitor.
+- Redesigned local web UI for Windows, Linux, and macOS.
+- Live CPU, resident memory, and disk I/O counters.
+- Supported power sources, explicit scope, and missing-data coverage.
+- Local recordings, workload comparisons, and CSV/JSON exports.
+- An efficiency launcher for explicitly selected background jobs.
+- Quit and confirmed Force Quit controls, with protected-process checks.
 
-## 🌿 Features
+No account, telemetry, remote UI assets, or administrator access for ordinary monitoring.
 
-- 🖥️ **Interactive Terminal UI** - Slash commands in your terminal (`/list`, `/track`, `/help`)
-- 💻 **Web GUI Dashboard** - Start a local web server with `/web` or `/gui` to view a premium real-time diagnostics dashboard
-- 🌊 **Real-time Monitoring** - Track CPU, memory, and energy usage with live updates
-- ⚡ **Energy Tracking** - Estimate power consumption and CO2 emissions per process
-- 🍃 **Green Score** - Get a 0-100 efficiency rating with eco equivalents
-- 🔍 **Window Titles** - Shows actual app names (not just process names) for easy identification
-- 📋 **Command Line Filtering** - `/list chrome` filters processes instantly
-- 🔒 **Privacy First** - All local processing, no AI dependencies, no data leaves your machine
+## macOS
 
-## 🚀 Installation
+Download the macOS ZIP or DMG from [Releases](https://github.com/serene-interactive/Seagreen/releases), then move **Seagreen.app** into Applications. Python is not required. Universal packages support Apple silicon and Intel Macs running macOS 13 or later.
 
-```bash
-git clone https://github.com/serene-interactive/seagreen.git
-cd seagreen
-pip install .
-```
+Local builds are ad-hoc signed, not Apple-notarized. macOS may require an explicit **Open Anyway** action in Privacy & Security.
 
-For development (editable install):
+## Windows / web UI
+
+Install Python, download or clone this repository, then run:
 
 ```bash
-pip install -e .
+python -m pip install .
+python -m seagreen web
 ```
 
-## 🖥️ Usage
+On Windows, you can also double-click **Launch Seagreen.cmd**. It creates a local virtual environment, installs the package, and opens the dashboard. The initial install needs an internet connection for Python dependencies.
 
-Launch Seagreen and use slash commands to interact:
+Keep the terminal open. The dashboard binds only to `127.0.0.1` and opens with a private per-launch token. If port 8080 is occupied:
 
 ```bash
-seagreen
+seagreen web --port 8081
 ```
 
-### Commands
+## Terminal
 
-| Command | Description |
-|---------|-------------|
-| `/list [filter]` | Show trackable processes (optional name filter) |
-| `/track <pid> [seconds]` | Monitor a process |
-| `/agent-track <pid> [seconds]` | Monitor with real-time energy TUI |
-| `/agents` | Detect and list agent processes |
-| `/agent-monitor` | Live dashboard for all running agents |
-| `/green <pid>` | Put process in low-power green mode |
-| `/ungreen <pid>` | Restore process from green mode |
-| `/green-list` | Show processes in green mode |
-| `/kill <pid>` | Terminate a process |
-| `/web` or `/gui` | Launch Seagreen Web GUI Dashboard |
-| `/help` | Show all available commands |
-| `/quit` | Exit Seagreen |
-
-### Quick Start
-
-```
-$ seagreen
-
-🌊 Seagreen - Live Process Energy Monitor
-
-Type /help for commands
-
-seagreen> /list
-  PID    Application                Type    Command
- ────────────────────────────────────────────────────
-  1234   Python: myapp.py           DEV     python myapp.py
-  5678   Python: server.py          DEV     python server.py
-
-seagreen> /track 1234 30
-Monitoring PID 1234 for 30s...
-
-Seagreen Process Energy Report
-==================================================
-  Process    Python: myapp.py
-  PID        1234
-  Runtime    python
-  Duration   30.0s
-
-Energy Consumption:
-  Current Power     2.50 W
-  Session Energy    0.021 kWh
-  Carbon Estimate   9.9 g CO2
-
-Efficiency Metrics:
-  Average CPU      8.2%
-  Peak CPU         15.0%
-  Average Memory   45.2 MB
-  Green Score      92/100
-  Rating           🌿🌿🌿 Excellent
+```bash
+seagreen                  # interactive slash commands
+seagreen list python
+seagreen monitor --pid 1234 --duration 60
 ```
 
-## 🌊 How It Works
+`/list`, `/track`, `/web`, `/gui`, `/agents`, `/help`, and `/quit` remain available. Use `/stop <pid>` to request quit or `/kill <pid>` to force quit, with confirmation. Shell commands `seagreen stop <pid>` and `seagreen kill <pid>` work too. Background scheduling is in the explicit job launcher. Legacy estimate APIs remain in `tracker.py` for compatibility; the v3 interfaces do not use them.
 
-Seagreen monitors your process and calculates:
+## Measurement
 
-- **Energy Consumption**: Power draw estimated from CPU utilization (watts → kWh)
-- **Carbon Footprint**: CO2 emissions based on your regional grid intensity
-- **Green Score**: 0-100 efficiency rating combining power, CPU, and memory
-- **Eco Rating**: 🌿🌿🌿 Excellent | 🌿🌿 Good | 🌿 Fair | 🍂 Needs Work
-- **Relatable Equivalents**: Smartphone charges, Google searches, streaming minutes, etc.
+Power availability depends on hardware and permissions. Windows web monitoring currently reports resources without inventing wattage. Supported Linux systems can expose RAPL CPU-package counters. The native Mac app can read battery discharge on supported MacBooks and optionally watch an Apple `powermetrics` plist file.
 
-### Energy Estimation
+Power readings always identify their scope. There is no guessed per-app wattage or carbon score. Savings comparisons require matching devices and sources, completed-work units, and at least 90% power coverage. See [measurement details](docs/measurement.md).
 
+## Build & test
+
+```bash
+python -m unittest discover -s tests -v
+bash desktop/scripts/build.sh
+bash desktop/scripts/test.sh
+ARCH=x86_64 bash desktop/scripts/build.sh
+bash desktop/scripts/package.sh
 ```
-Watts = idle_power + (max_power - idle_power) × (cpu_percent / 100)
-kWh = watts × (duration_seconds / 3600)
-CO2 = kWh × grid_intensity (g CO2/kWh)
-```
 
-## 🎨 The Seagreen Palette
+macOS builds require matching Apple Command Line Tools and SDK versions. `SDKROOT` can select an installed compatible SDK. Every build creates a fresh app bundle under `desktop/build/apps/`; it never overwrites an open app. ZIP/DMG packages are created under `desktop/build/releases/`.
 
-Our colors match the [Serene Interactive website](https://sereneinteractive.com):
-
-| Color | Hex | Usage |
-|-------|-----|-------|
-| Serene Green | `#3d8b6f` | Primary brand |
-| Ocean | `#2d6b5d` | Headers |
-| Leaf | `#6bc99a` | Accents |
-| Mist | `#e8f5f0` | Backgrounds |
-
-## 🌍 Why Seagreen?
-
-At Serene Interactive, we believe that the most powerful code is also the most efficient. Seagreen helps developers visualize "Computational Waste" and promotes a greener digital ecosystem.
-
-> *"The greenest code is efficient code."* 🌿
-
-## 📋 Requirements
-
-- Python 3.8+
-- psutil
-- rich
-
-## 🤝 Contributing
-
-We welcome contributions! This is our first open-source project, and we're excited to grow it with the community.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/cool-thing`)
-3. Commit your changes (`git commit -m 'Add cool thing'`)
-4. Push to the branch (`git push origin feature/cool-thing`)
-5. Open a Pull Request
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file
-
-## 🌊 About Serene Interactive
-
-Serene Interactive, Global is an AI research and development company. We build software and AI systems with privacy, accessibility, and sustainability at their core. We believe smart technology should never come at the cost of your privacy or the future.
-
-- 🌐 [sereneinteractive.com](https://sereneinteractive.com)
-- 💬 [Discord](https://discord.gg/rosy)
-
----
-
-<p align="center">
-  <strong>🌊 Built with 💚 by Serene Interactive, Global 🌿</strong>
-</p>
+[MIT](LICENSE) · [Serene Interactive](https://sereneinteractive.com)

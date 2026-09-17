@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seagreen"
-version = "2.1.0"
-description = "Live process energy & carbon monitoring for developers"
+version = "3.0.0"
+description = "Local resource and energy monitoring with a macOS app and web UI"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -19,6 +19,10 @@ dependencies = [
 
 [project.scripts]
 seagreen = "seagreen.__main__:main"
+seagreen-web = "seagreen.server:main"
 
 [tool.setuptools.packages.find]
 include = ["seagreen*"]
+
+[tool.setuptools.package-data]
+seagreen = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg"]
